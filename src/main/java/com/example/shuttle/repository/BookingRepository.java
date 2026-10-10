@@ -18,4 +18,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
            """)
     List<Booking> findOrdered(@Param("tripId") Long tripId,
                               @Param("state") BookingState state);
+    List<Booking> findByTripIdAndState(Long tripId, BookingState state);
 }
