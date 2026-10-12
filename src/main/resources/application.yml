@@ -9,6 +9,11 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  cache:
+    type: caffeine
+    cache-names: availability
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=5s
 management:
   endpoints:
     web:

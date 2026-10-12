@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 public interface TripRepository extends JpaRepository<Trip, Long> {
@@ -15,4 +17,6 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from Trip t where t.id = :id")
     Optional<Trip> findByIdForUpdate(@Param("id") Long id);
+
+    List<Trip> findByCheckInCutoffBeforeAndNoShowProcessedFalse(Instant now);
 }
