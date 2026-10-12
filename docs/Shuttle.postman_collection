@@ -1,0 +1,541 @@
+{
+  "info": {
+    "name": "Shuttle Waitlist & Fair Seat Promotion",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run requests 1-13 in order (or use Runner). Step 1 creates a trip and saves tripId; step 2 saves booking1Id."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "tripId",
+      "value": ""
+    },
+    {
+      "key": "booking1Id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Admin creates a 1-seat trip",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "admin"
+          },
+          {
+            "key": "X-Role",
+            "value": "ADMIN"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"capacity\": 1,\n  \"checkInCutoff\": \"2030-01-01T00:00:00Z\",\n  \"quotas\": {\n    \"CC1\": 5\n  }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('tripId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. emp1 books (gets the seat)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "emp1"
+          },
+          {
+            "key": "X-Role",
+            "value": "EMPLOYEE"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}/bookings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}",
+            "bookings"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"costCentre\": \"CC1\",\n  \"partySize\": 1,\n  \"tier\": 0\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 seated', () => pm.response.to.have.status(201));",
+              "pm.test('CONFIRMED', () => pm.expect(pm.response.json().state).to.eql('CONFIRMED'));",
+              "pm.collectionVariables.set('booking1Id', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. emp2 books a GROUP of 2 (waitlisted)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "emp2"
+          },
+          {
+            "key": "X-Role",
+            "value": "EMPLOYEE"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}/bookings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}",
+            "bookings"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"costCentre\": \"CC1\",\n  \"partySize\": 2,\n  \"tier\": 0\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 waitlisted', () => pm.response.to.have.status(202));",
+              "pm.test('WAITLISTED', () => pm.expect(pm.response.json().state).to.eql('WAITLISTED'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. emp3 books a single (waitlisted)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "emp3"
+          },
+          {
+            "key": "X-Role",
+            "value": "EMPLOYEE"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}/bookings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}",
+            "bookings"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"costCentre\": \"CC1\",\n  \"partySize\": 1,\n  \"tier\": 0\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 waitlisted', () => pm.response.to.have.status(202));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Admin views waitlist (group first, then emp3)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "admin"
+          },
+          {
+            "key": "X-Role",
+            "value": "ADMIN"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}/waitlist",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}",
+            "waitlist"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('2 waiting', () => pm.expect(pm.response.json().length).to.eql(2));",
+              "pm.test('group is first', () => pm.expect(pm.response.json()[0].partySize).to.eql(2));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. emp1 cancels -> group SKIPPED, emp3 PROMOTED",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "emp1"
+          },
+          {
+            "key": "X-Role",
+            "value": "EMPLOYEE"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/bookings/{{booking1Id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "bookings",
+            "{{booking1Id}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('exactly one promotion', () => pm.expect(pm.response.json().promotedBookingIds.length).to.eql(1));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Waitlist after cancel (group still waiting, skipCount 1)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "admin"
+          },
+          {
+            "key": "X-Role",
+            "value": "ADMIN"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}/waitlist",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}",
+            "waitlist"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('group kept its place', () => { const w = pm.response.json(); pm.expect(w.length).to.eql(1); pm.expect(w[0].partySize).to.eql(2); pm.expect(w[0].skipCount).to.eql(1); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Trip availability (cached up to 5 s - wait 6 s after step 6)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "emp1"
+          },
+          {
+            "key": "X-Role",
+            "value": "EMPLOYEE"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('bus full again', () => pm.expect(pm.response.json().freeSeats).to.eql(0));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Metrics: promotions counter",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/actuator/metrics/shuttle.promotions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "actuator",
+            "metrics",
+            "shuttle.promotions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "10. Employee tries admin action -> 403",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "emp1"
+          },
+          {
+            "key": "X-Role",
+            "value": "EMPLOYEE"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"capacity\": 1,\n  \"checkInCutoff\": \"2030-01-01T00:00:00Z\",\n  \"quotas\": {\n    \"CC1\": 1\n  }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. No headers -> 401",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Duplicate booking -> 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "emp2"
+          },
+          {
+            "key": "X-Role",
+            "value": "EMPLOYEE"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}/bookings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}",
+            "bookings"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"costCentre\": \"CC1\",\n  \"partySize\": 1,\n  \"tier\": 0\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Admin reclaims no-shows (force)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User",
+            "value": "admin"
+          },
+          {
+            "key": "X-Role",
+            "value": "ADMIN"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/trips/{{tripId}}/reclaim?force=true",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "trips",
+            "{{tripId}}",
+            "reclaim"
+          ],
+          "query": [
+            {
+              "key": "force",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
