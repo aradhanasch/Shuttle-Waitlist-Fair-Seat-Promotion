@@ -1,14 +1,29 @@
 # Shuttle Waitlist & Fair Seat Promotion
 
-Spring Boot 4 / Java 17 / H2 / Flyway. Layers: controller -> service -> repository -> domain.
+Office shuttle seat booking with a fair waitlist. When a seat frees up, the right waitlisted
+employee (or group) is promoted automatically, respecting both vehicle capacity and
+per-cost-centre quotas, and without ever over-booking, even under concurrency.
+
+Stack: Java 17, Spring Boot 4, Spring Data JPA (Hibernate 7), H2 (Postgres-compatible schema),
+Flyway, Caffeine cache, Micrometer/Actuator, JUnit 5.
+Layers: `controller -> service -> repository -> domain`.
 
 ## Run
 ```
 .\mvnw.cmd spring-boot:run     # app on http://localhost:8080
 .\mvnw.cmd clean test          # 20 tests, including concurrency tests
-.\demo.ps1                     # sample API calls (app must be running)
 ```
 Every call needs headers `X-User: <id>` and `X-Role: EMPLOYEE | APPROVER | ADMIN`.
+
+## Demo
+- **Postman:** import `docs/Shuttle.postman_collection.json` and run requests 1-13 in order
+  (or use the Collection Runner). Each request has assertions; all 13 pass.
+- **PowerShell alternative:** `.\demo.ps1`
+- Screenshots are in [`docs/`](docs/).
+
+Demo scenario (from the case study): a 1-seat trip is full, a group of 2 and a single are
+waitlisted, the seated person cancels -> the group of 2 is **skipped** (only 1 seat freed),
+the single is **promoted** and gets an SMS (logged by the stub sender).
 
 ## API
 | Method | Endpoint | Role |
@@ -22,6 +37,14 @@ Every call needs headers `X-User: <id>` and `X-Role: EMPLOYEE | APPROVER | ADMIN
 | POST | `/bookings/{id}/check-in` | EMPLOYEE (owner) |
 | POST | `/trips/{id}/reclaim?force=true` | ADMIN |
 | GET | `/actuator/metrics/shuttle.promotions` | any |
+
+Errors are JSON: `{"code": "...", "message": "...", "timestamp": "..."}` with 400, 401, 403,
+404 or 409. Stack traces are only logged, never returned.
+
+## Data model
+![ER diagram](docs/er-diagram.png)
+
+Full diagram and a Mermaid version: [docs/er-diagram.md](docs/er-diagram.md).
 
 ## Design
 - **Per-trip serialisation.** Every book / cancel / check-in / reclaim / quota change starts with
@@ -45,10 +68,20 @@ Every call needs headers `X-User: <id>` and `X-Role: EMPLOYEE | APPROVER | ADMIN
   `no_show_reclaims`, `rejections`, `notifications_sent`.
 - **Caching.** Caffeine cache on `GET /trips/{id}` (5 s TTL, max 500, evicted on every mutation).
   Stale: seat counts and waitlist length can lag up to 5 s. The booking path never reads the cache.
-- **Errors.** `@RestControllerAdvice` with typed exceptions; no stack traces in responses.
+
+## Tests (20)
+| Suite | What it proves |
+|---|---|
+| `BookingServiceTest` | confirm, waitlist when full, quota blocks despite free seats, FIFO order |
+| `PromotionTest` | cancel promotes top single; group of 2 skipped when 1 seat frees; quota-blocked seat; idempotent cancel |
+| `ConcurrencyTest` | 20 threads racing for the last seat; two simultaneous cancels -> exactly 2 promotions; same booking cancelled twice at once frees one seat |
+| `ReclaimTest` | no-show reclaimed and next person promoted; idempotent; respects cut-off |
+| `GroupAndTiebreakTest` | group of 3 boards only when 3 seats free; FIFO beats tier; duplicate booking rejected |
 
 ## Complexity
-Promotion is O(W) per event (W = waitlist size); space is O(bookings).
+Promotion is O(W) per event (W = waitlist size) because it walks the ordered waitlist once.
+Space is O(bookings). Possible optimisation: per-cost-centre queues plus a minimum-party-size
+index to skip ineligible entries quickly.
 
 ## Trade-offs and what is not implemented
 - **Auth is header-based** (`X-User`, `X-Role`), a demo simplification with no real authentication.
